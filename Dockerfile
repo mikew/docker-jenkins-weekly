@@ -1,8 +1,17 @@
-FROM java:8u45-jdk
-
-RUN apt-get update && apt-get install -y wget git curl zip && rm -rf /var/lib/apt/lists/*
+FROM java:8-jdk
 
 ENV JENKINS_HOME /var/jenkins_home
+ENV JENKINS_UC https://updates.jenkins-ci.org
+ENV COPY_REFERENCE_FILE_LOG /var/log/copy_reference_file.log
+
+# for main web interface:
+EXPOSE 8080
+
+# will be used by attached slave agents:
+EXPOSE 50000
+
+RUN sed -i 's/httpredir/ftp.us/' /etc/apt/sources.list
+RUN apt-get update && apt-get install -y wget git curl zip && rm -rf /var/lib/apt/lists/*
 
 # Jenkins is ran with user `jenkins`, uid = 1000
 # If you bind mount a volume from host/vloume from a data container, 
@@ -17,29 +26,24 @@ VOLUME /var/jenkins_home
 # to set on a fresh new installation. Use it to bundle additional plugins 
 # or config file with your custom jenkins Docker image.
 RUN mkdir -p /usr/share/jenkins/ref/init.groovy.d
-
-
 COPY init.groovy /usr/share/jenkins/ref/init.groovy.d/tcp-slave-agent-port.groovy
 
-ENV JENKINS_VERSION 1.596.2
-ENV JENKINS_SHA 96ee85602a41d68c164fb54d4796be5d1d9cc5d0
+#ENV JENKINS_VERSION 1.596.2
+#ENV JENKINS_SHA 96ee85602a41d68c164fb54d4796be5d1d9cc5d0
 
 # could use ADD but this one does not check Last-Modified header 
 # see https://github.com/docker/docker/issues/8331
-RUN curl -fL http://mirrors.jenkins-ci.org/war-stable/$JENKINS_VERSION/jenkins.war -o /usr/share/jenkins/jenkins.war \
-  && echo "$JENKINS_SHA /usr/share/jenkins/jenkins.war" | sha1sum -c -
+#RUN curl -fL http://mirrors.jenkins-ci.org/war-stable/$JENKINS_VERSION/jenkins.war -o /usr/share/jenkins/jenkins.war \
+#  && echo "$JENKINS_SHA /usr/share/jenkins/jenkins.war" | sha1sum -c -
 
-ENV JENKINS_UC https://updates.jenkins-ci.org
-RUN chown -R jenkins "$JENKINS_HOME" /usr/share/jenkins/ref
-
-# for main web interface:
-EXPOSE 8080
-
-# will be used by attached slave agents:
-EXPOSE 50000
-
-ENV COPY_REFERENCE_FILE_LOG /var/log/copy_reference_file.log
-RUN touch $COPY_REFERENCE_FILE_LOG && chown jenkins.jenkins $COPY_REFERENCE_FILE_LOG
+ADD http://mirrors.jenkins-ci.org/war/latest/jenkins.war /usr/share/jenkins/jenkins.war
+RUN touch $COPY_REFERENCE_FILE_LOG \
+    && chown -R jenkins.jenkins \
+        "$COPY_REFERENCE_FILE_LOG" \
+        "$JENKINS_HOME" \
+        /usr/share/jenkins/ref \
+        /usr/share/jenkins/jenkins.war
+#RUN chown -R jenkins "$JENKINS_HOME" /usr/share/jenkins/ref
 
 USER jenkins
 
